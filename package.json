@@ -1,0 +1,66 @@
+{
+  "name": "@metaloot/sdk",
+  "version": "0.1.0",
+  "description": "Unified Metaloot SDK for games: hosted 2D, 3D, audio and animation assets, player auth, and multiplayer rooms.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Metaloot",
+  "homepage": "https://metaloot.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Complexia/metaloot-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Complexia/metaloot-sdk/issues"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./assets": {
+      "types": "./dist/assets.d.ts",
+      "import": "./dist/assets.js"
+    },
+    "./auth": {
+      "types": "./dist/auth.d.ts",
+      "import": "./dist/auth.js"
+    },
+    "./multiplayer": {
+      "types": "./dist/multiplayer.d.ts",
+      "import": "./dist/multiplayer.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist",
+    "prepack": "npm run clean && npm run build",
+    "test": "npm run build && node --test tests/*.test.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "metaloot",
+    "games",
+    "3d-assets",
+    "2d-assets",
+    "game-audio",
+    "animation",
+    "glb",
+    "multiplayer",
+    "auth",
+    "browser-games"
+  ],
+  "devDependencies": {
+    "@types/node": "^20.19.0",
+    "typescript": "^5.9.0"
+  }
+}
