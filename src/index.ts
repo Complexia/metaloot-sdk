@@ -42,8 +42,8 @@ export type MetalootOptions = {
   /** Studio origin for asset APIs. @default "https://studio.metaloot.app" */
   studioOrigin?: string;
   /**
-   * Metaloot CLI token (`mlt_…`) for private-asset access; never needed in
-   * browser game code for public assets.
+   * Scoped Metaloot API token (`mtl_api_…`) or CLI token (`mtl_cli_…`) for
+   * private-asset access; never needed for public assets.
    */
   token?: string;
   /** Path prefix of the game's auth endpoints. @default "/auth/metaloot" */

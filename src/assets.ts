@@ -149,9 +149,9 @@ export type AssetRequestOptions = {
   /** Studio origin. @default "https://studio.metaloot.app" */
   origin?: string;
   /**
-   * Metaloot CLI token (`mlt_…`, from metaloot.app/cli/auth), sent as an
-   * `Authorization: Bearer` header. Only needed for private assets — public
-   * assets are served without auth.
+   * Scoped API token (`mtl_api_…`, from metaloot.app/settings/api-tokens) or
+   * CLI token (`mtl_cli_…`), sent as an `Authorization: Bearer` header. Only
+   * needed for private assets — public assets are served without auth.
    */
   token?: string;
   /** Custom fetch implementation. @default globalThis.fetch */

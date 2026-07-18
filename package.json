@@ -1,6 +1,6 @@
 {
   "name": "@metaloot/sdk",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Unified Metaloot SDK for games: hosted 2D, 3D, audio and animation assets, player auth, and multiplayer rooms.",
   "type": "module",
   "license": "MIT",
@@ -35,6 +35,14 @@
     "./multiplayer": {
       "types": "./dist/multiplayer.d.ts",
       "import": "./dist/multiplayer.js"
+    },
+    "./three": {
+      "types": "./dist/three.d.ts",
+      "import": "./dist/three.js"
+    },
+    "./babylon": {
+      "types": "./dist/babylon.d.ts",
+      "import": "./dist/babylon.js"
     }
   },
   "scripts": {
@@ -60,8 +68,22 @@
     "browser-games"
   ],
   "devDependencies": {
+    "@babylonjs/core": "^8.0.0",
+    "@babylonjs/loaders": "^8.0.0",
     "@types/node": "^20.19.0",
+    "@types/three": "^0.178.0",
+    "three": "^0.178.0",
     "typescript": "^5.9.0"
+  },
+  "peerDependencies": {
+    "@babylonjs/core": ">=7.0.0",
+    "@babylonjs/loaders": ">=7.0.0",
+    "three": ">=0.160.0"
+  },
+  "peerDependenciesMeta": {
+    "@babylonjs/core": { "optional": true },
+    "@babylonjs/loaders": { "optional": true },
+    "three": { "optional": true }
   },
   "publishConfig": {
     "access": "public"

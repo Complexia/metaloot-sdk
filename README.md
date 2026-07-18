@@ -160,10 +160,12 @@ No three.js dependency — `loadAsset` and `loadAnimation` return
 `ArrayBuffer`s you can feed to any engine (`GLTFLoader.parse`, Babylon
 `SceneLoader`, …), and they work in the browser, Node 20+, and Workers alike.
 
-Private assets are only served to their owner: pass a CLI token from
-[metaloot.app/cli/auth](https://metaloot.app/cli/auth) as
-`{ token: "mlt_…" }` (server-side code only — don't ship tokens in a game
-bundle; make the asset public or download it into the game instead).
+Private assets are only served to their owner. Create a scoped token with
+`assets:read` at
+[metaloot.app/settings/api-tokens](https://metaloot.app/settings/api-tokens),
+then pass `{ token: "mtl_api_…" }`. This works from local browser games with
+CORS, Node, and Workers. Never commit the token or include it in a production
+bundle; make the asset public or download it into the game for deployment.
 
 Metadata matches the studio API:
 
@@ -178,6 +180,70 @@ const characters = await listAssets({
   kind: "model3d",
 });
 const mine   = await listAssets({ scope: "private", token }); // your assets
+```
+
+### Three.js adapter
+
+The optional `@metaloot/sdk/three` adapter turns a hosted asset into a
+game-ready Three.js instance. It handles `GLTFLoader`, game-ready LOD
+selection, rigged animation variants, `AnimationMixer` actions, crossfades,
+uniform height scaling, centering, grounding, shadows, bounds, and disposal:
+
+```bash
+npm install @metaloot/sdk three
+```
+
+```ts
+import { loadThreeAsset } from "@metaloot/sdk/three";
+
+const hero = await loadThreeAsset("ember-mage", {
+  scene,
+  animations: ["idle", "walk", "run"], // or "available"
+  targetHeight: 1.8,
+  shadows: true,
+  autoPlay: "idle",
+  token: import.meta.env.DEV ? import.meta.env.VITE_METALOOT_TOKEN : undefined,
+});
+
+// In the render loop:
+hero.update(clock.getDelta());
+
+// State transitions crossfade automatically:
+hero.play(speed > 0.1 ? "run" : "idle");
+
+console.log(hero.bounds); // ready for framing or simple collision
+hero.dispose();
+```
+
+Pass a preconfigured `loader` when a game uses DRACO/KTX2. The adapter never
+creates a renderer, camera, lights, physics body, or gameplay collision shape;
+those remain deliberate game-level choices, while `bounds` provides the data
+needed to create one.
+
+### Babylon.js adapter
+
+The optional Babylon adapter loads an `AssetContainer`, creates and places a
+root mesh, merges requested Metaloot animation variants by node name, exposes
+named `AnimationGroup`s and bounds, configures shadows, and owns cleanup:
+
+```bash
+npm install @metaloot/sdk @babylonjs/core @babylonjs/loaders
+```
+
+```ts
+import { loadBabylonAsset } from "@metaloot/sdk/babylon";
+
+const hero = await loadBabylonAsset("ember-mage", {
+  scene,
+  animations: "available",
+  targetHeight: 1.8,
+  receiveShadows: true,
+  shadowGenerator,
+  autoPlay: "idle",
+});
+
+hero.play("run");
+hero.dispose();
 ```
 
 ## Auth
@@ -244,7 +310,7 @@ The whole pipeline is scriptable end to end — generate assets with the CLI,
 reference them by id in code, deploy:
 
 ```bash
-export METALOOT_TOKEN="mlt_…"   # once, from metaloot.app/cli/auth
+export METALOOT_TOKEN="mtl_api_…" # scoped token from metaloot.app/settings/api-tokens
 
 # 1. Generate a PUBLIC asset so the game can hot-link it (1-3 minutes).
 metaloot assets generate --prompt "low-poly treasure chest, game-ready" \
@@ -255,8 +321,8 @@ ASSET_ID=$(node -p "JSON.parse(require('fs').readFileSync('asset.json','utf8')).
 
 ```ts
 // 2. Reference it in game code — no file ships with the game.
-import { loadAssetObjectUrl } from "@metaloot/sdk";
-new GLTFLoader().load(await loadAssetObjectUrl("<ASSET_ID>"), (gltf) => scene.add(gltf.scene));
+import { loadThreeAsset } from "@metaloot/sdk/three";
+await loadThreeAsset("<ASSET_ID>", { scene, targetHeight: 1.8, shadows: true });
 ```
 
 ```bash
@@ -267,8 +333,9 @@ metaloot deploy
 
 Notes:
 
-- Hot-linking requires `--visibility public`. For private assets, download
-  and ship the file instead: `metaloot assets download <id> --dir public/assets`.
+- Public assets hot-link without a token. A local game can load an owned
+  private asset with a scoped `assets:read` token; download and ship the file
+  before production so the credential never enters a deployed browser bundle.
 - No SDK required for the simplest path: the hosted URL
   `https://studio.metaloot.app/api/assets/<id>/file` (or, on Metaloot
   hosting, `/__metaloot/assets/<id>.glb`) works directly with
