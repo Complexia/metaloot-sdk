@@ -1,6 +1,6 @@
 {
   "name": "@metaloot/sdk",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Unified Metaloot SDK for games: hosted 2D, 3D, audio and animation assets, player auth, and multiplayer rooms.",
   "type": "module",
   "license": "MIT",
