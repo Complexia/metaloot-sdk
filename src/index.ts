@@ -171,6 +171,14 @@ export type {
   MetalootAsset,
   RigStatus,
 } from "./assets.js";
+export {
+  TRIPO_BONE_MAP,
+  autoMapBones,
+  findHipBone,
+  normalizeBoneName,
+  resolveBoneMap,
+} from "./retarget.js";
+export type { BoneDescriptor, BoneMapResult, BoneVector } from "./retarget.js";
 export { DEFAULT_AUTH_BASE_PATH, getSession, signIn, signOut } from "./auth.js";
 export type { AuthOptions } from "./auth.js";
 export {

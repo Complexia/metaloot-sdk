@@ -5,8 +5,10 @@ import {
 import type { AssetContainer } from "@babylonjs/core/assetContainer.js";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh.js";
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup.js";
+import type { Material } from "@babylonjs/core/Materials/material.js";
 import type { Scene } from "@babylonjs/core/scene.js";
 import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator.js";
+import { Color3 } from "@babylonjs/core/Maths/math.color.js";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector.js";
 import {
   getAsset,
@@ -15,6 +17,17 @@ import {
   type LoadAssetOptions,
   type MetalootAsset,
 } from "./assets.js";
+
+export type NormalizeBabylonMaterialsOptions = {
+  /** Normalization preset. "game" is currently the only preset. @default "game" */
+  preset?: "game";
+  /** Clamp metallic of materials without reflections available to at most this. @default 0.2 */
+  maxMetalness?: number;
+  /** Raise roughness to at least this floor. @default 0.6 */
+  minRoughness?: number;
+  /** Recolor materials by name: `{ grass: 0x4c9e45 }` or `{ grass: "#4c9e45" }`. */
+  materialOverrides?: Readonly<Record<string, number | string>>;
+};
 
 export type LoadBabylonAssetOptions = LoadAssetOptions & {
   scene: Scene;
@@ -26,6 +39,12 @@ export type LoadBabylonAssetOptions = LoadAssetOptions & {
   receiveShadows?: boolean;
   shadowGenerator?: ShadowGenerator;
   autoPlay?: string;
+  /**
+   * Make hosted materials game-ready before the instance is returned: `true`
+   * applies the "game" preset, or pass {@link NormalizeBabylonMaterialsOptions}
+   * to tune it. @default false
+   */
+  normalizeMaterials?: boolean | NormalizeBabylonMaterialsOptions;
 };
 
 export type BabylonAssetInstance = {
@@ -70,6 +89,12 @@ export async function loadBabylonAsset(
   );
   const root = container.createRootMesh();
   container.addAllToScene();
+  if (options.normalizeMaterials) {
+    normalizeBabylonMaterials(
+      container.materials,
+      options.normalizeMaterials === true ? {} : options.normalizeMaterials,
+    );
+  }
 
   const groups: Record<string, AnimationGroup> = {};
   for (const group of container.animationGroups) {
@@ -133,6 +158,58 @@ export async function loadBabylonAsset(
   };
   if (options.autoPlay) instance.play(options.autoPlay);
   return instance;
+}
+
+/**
+ * Makes hosted PBR materials game-ready — the Babylon mirror of the three.js
+ * adapter's `normalizeMaterials`. Clamps `metallic` (skipping materials whose
+ * scene provides reflections), raises the `roughness` floor, and applies
+ * per-material-name albedo color overrides. Pass `container.materials`,
+ * `scene.materials`, or any material list. Returns the number of materials
+ * that were changed.
+ */
+export function normalizeBabylonMaterials(
+  materials: readonly Material[],
+  options: NormalizeBabylonMaterialsOptions = {},
+): number {
+  const maxMetalness = options.maxMetalness ?? 0.2;
+  const minRoughness = options.minRoughness ?? 0.6;
+  const overrides = options.materialOverrides ?? {};
+  let normalized = 0;
+  for (const material of materials) {
+    let touched = false;
+    const pbr = material as Material & {
+      metallic?: number | null;
+      roughness?: number | null;
+      albedoColor?: Color3;
+      reflectionTexture?: unknown;
+    };
+    const hasReflections = Boolean(
+      pbr.reflectionTexture ?? material.getScene?.()?.environmentTexture,
+    );
+    if (!hasReflections && typeof pbr.metallic === "number" && pbr.metallic > maxMetalness) {
+      pbr.metallic = maxMetalness;
+      touched = true;
+    }
+    if (typeof pbr.roughness === "number" && pbr.roughness < minRoughness) {
+      pbr.roughness = minRoughness;
+      touched = true;
+    }
+    const override = overrides[material.name];
+    if (override !== undefined && pbr.albedoColor) {
+      pbr.albedoColor = toColor3(override);
+      touched = true;
+    }
+    if (touched) normalized += 1;
+  }
+  return normalized;
+}
+
+function toColor3(value: number | string): Color3 {
+  const hex = typeof value === "number"
+    ? `#${value.toString(16).padStart(6, "0")}`
+    : value.startsWith("#") ? value : `#${value}`;
+  return Color3.FromHexString(hex);
 }
 
 function normalizeBabylonRoot(root: AbstractMesh, options: LoadBabylonAssetOptions) {

@@ -220,6 +220,131 @@ creates a renderer, camera, lights, physics body, or gameplay collision shape;
 those remain deliberate game-level choices, while `bounds` provides the data
 needed to create one.
 
+#### Game-ready materials
+
+Hosted GLBs — studio-generated models and curated catalog packs alike — may
+ship materials tuned for a PBR viewer rather than a game: `metallicFactor: 1`
+with no environment map renders near-black in a typical three.js scene, and
+some stylized packs carry off-palette base colors (aqua grass, pure-white
+stone) that wash out further under ACES tone mapping. Opt in to the `game`
+preset instead of hand-rolling per-material fixups:
+
+```ts
+const rock = await loadThreeAsset("rock-large", {
+  scene,
+  normalizeMaterials: true, // game preset: metalness ≤ 0.2, roughness ≥ 0.6
+});
+
+// Tune the thresholds, or recolor specific materials by glTF material name:
+const tree = await loadThreeAsset("tree-pine", {
+  scene,
+  normalizeMaterials: {
+    maxMetalness: 0,
+    minRoughness: 0.8,
+    materialOverrides: { grass: 0x4c9e45, leafsFall: "#c26a2d" },
+  },
+});
+```
+
+The option defaults to off, so existing scenes render exactly as before, but
+the preset is the recommended starting point for new games. Materials that
+bring their own `envMap` keep their metalness; if your scene supplies
+reflections through `scene.environment` and you want true metals, pass
+`maxMetalness: 1` or leave normalization off for those assets.
+
+The standalone helper works with any loaded GLTF, not just Metaloot loads:
+
+```ts
+import { normalizeMaterials } from "@metaloot/sdk/three";
+
+const gltf = await loader.loadAsync(url);
+normalizeMaterials(gltf.scene, { materialOverrides: { stone: 0x8a8f98 } });
+```
+
+#### Borrowing animations from the Universal Animation Library
+
+Metaloot hosts the Quaternius **Universal Animation Library** as a curated
+pack (`quaternius-universal-animation-library`): a UE-Mannequin-style
+humanoid skeleton with 43 high-quality clips (`Idle_Loop`, `Walk_Loop`,
+`Sprint_Loop`, `Sword_Attack`, `Roll`, …). The three adapter can retarget
+those clips onto **any humanoid model** — Metaloot Studio's auto-rigged
+(Tripo) characters or your own GLBs — so a hero is not limited to the
+Metaloot animation presets:
+
+```ts
+import { loadThreeAsset } from "@metaloot/sdk/three";
+
+const hero = await loadThreeAsset("path-knight-8082eb40", {
+  scene,
+  animations: ["idle"],           // a rigged base — retargeting needs a skeleton
+  targetHeight: 1.8,
+  animationLibrary: {
+    source: "quaternius-universal-animation-library",
+    clips: ["Idle_Loop", "Walk_Loop", "Sprint_Loop", "Sword_Attack"],
+    rename: { Idle_Loop: "ual-idle", Walk_Loop: "walk", Sprint_Loop: "run", Sword_Attack: "attack" },
+  },
+  autoPlay: "idle",
+});
+
+hero.play("run");                  // retargeted clips are ordinary actions
+console.log(hero.retarget);        // which bones mapped, which did not
+```
+
+Or do it by hand — load a hero any way you like, borrow clips explicitly:
+
+```ts
+import { loadAnimationLibrary, retargetClips, loadThreeAsset } from "@metaloot/sdk/three";
+import { AnimationMixer } from "three";
+
+const hero = await loadThreeAsset("path-knight-8082eb40", { scene, animations: ["idle"] });
+const library = await loadAnimationLibrary("quaternius-universal-animation-library");
+console.log(library.clipNames);    // all 43 clips
+
+const { clips, boneMap, unmappedTargetBones } = retargetClips(hero.root, library, {
+  clips: ["Idle_Loop", "Walk_Loop", "Jog_Fwd_Loop"],
+});
+library.dispose();                 // retargeted clips are self-contained
+
+const mixer = new AnimationMixer(hero.root);
+mixer.clipAction(clips.Walk_Loop).play();
+// … mixer.update(delta) in the render loop
+```
+
+The default `preset: "auto"` maps bones by normalized names **plus the actual
+bone hierarchy and bind pose**. That matters for real Tripo rigs: their chain
+names are unreliable (production rigs have been observed with leg chains
+named `0_Left_Limb_*`, an arm spelled `Spine_3 → bone_8 → bone_9`, and the
+`Root` bone at ground level), so the mapper classifies ambiguous chains by
+where they attach and which way they run, and anchors hip translation at the
+target's own bind-pose hip position with motion scaled to the skeletons'
+height ratio. A static `preset: "tripo"` map for the documented Tripo v2.5
+naming scheme is also available (`TRIPO_BONE_MAP`).
+
+**Auto-mapping quality has limits.** It transfers the core humanoid pose
+(hips, spine, neck/head, arms, legs) but drops what the target cannot
+express: UAL finger curls on a fingerless rig, leaf/end bones, and root
+motion for rigs without a dedicated root bone (use the pack's
+`UAL1_Standard_RM.glb` via `path` for root-motion variants). Always check the
+returned report — `unmappedTargetBones` stay in bind pose,
+`unmappedLibraryBones` lose their motion — and expect side-cases (weapon
+bones, capes, off-axis bind poses) to need help. When the heuristic guesses
+wrong, supply a custom map; it overrides individual auto entries and is
+matched with name normalization (write `tripo::Root` or `tripoRoot`, both
+work):
+
+```ts
+retargetClips(hero.root, library, {
+  boneMap: {
+    "tripo::Spine_3": "clavicle_l",  // force a mapping
+    "tripo::Head_2": "",             // remove one (bone keeps its bind pose)
+  },
+});
+```
+
+The pure planning helpers (`autoMapBones`, `resolveBoneMap`,
+`normalizeBoneName`, `findHipBone`, `TRIPO_BONE_MAP`) are exported from the
+zero-dependency core too, so tooling can inspect mappings without three.js.
+
 ### Babylon.js adapter
 
 The optional Babylon adapter loads an `AssetContainer`, creates and places a
@@ -245,6 +370,12 @@ const hero = await loadBabylonAsset("ember-mage", {
 hero.play("run");
 hero.dispose();
 ```
+
+The Babylon adapter mirrors the three.js `normalizeMaterials` option — pass
+`normalizeMaterials: true` (or `{ maxMetalness, minRoughness,
+materialOverrides }`) to make hosted PBR materials game-ready, and use the
+standalone `normalizeBabylonMaterials(container.materials, opts)` with any
+loaded container.
 
 ## Auth
 
