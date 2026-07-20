@@ -1,6 +1,6 @@
 {
   "name": "@metaloot/sdk",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Unified Metaloot SDK for games: hosted 2D, 3D, audio and animation assets, player auth, and multiplayer rooms.",
   "type": "module",
   "license": "MIT",
@@ -85,9 +85,15 @@
     "three": ">=0.160.0"
   },
   "peerDependenciesMeta": {
-    "@babylonjs/core": { "optional": true },
-    "@babylonjs/loaders": { "optional": true },
-    "three": { "optional": true }
+    "@babylonjs/core": {
+      "optional": true
+    },
+    "@babylonjs/loaders": {
+      "optional": true
+    },
+    "three": {
+      "optional": true
+    }
   },
   "publishConfig": {
     "access": "public"
