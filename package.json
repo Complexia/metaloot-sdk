@@ -40,6 +40,10 @@
       "types": "./dist/three.d.ts",
       "import": "./dist/three.js"
     },
+    "./water": {
+      "types": "./dist/water.d.ts",
+      "import": "./dist/water.js"
+    },
     "./babylon": {
       "types": "./dist/babylon.d.ts",
       "import": "./dist/babylon.js"

@@ -377,6 +377,84 @@ materialOverrides }`) to make hosted PBR materials game-ready, and use the
 standalone `normalizeBabylonMaterials(container.materials, opts)` with any
 loaded container.
 
+## Water
+
+The optional `@metaloot/sdk/water` module is a stylized-water kit for
+Three.js scenes: a shader material (animated waves, caustics, a shore foam
+ring, sparkles, sky tint) plus the geometry builders that feed it — a river
+ribbon along a centerline and a "pools" flood-fill that finds every lake in
+a heightfield. The look is driven by a single float vertex attribute,
+`aDepth` (0 at the shore → 1 at full depth), which both builders pack for
+you:
+
+```bash
+npm install @metaloot/sdk three
+```
+
+```ts
+import {
+  buildPoolsGeometry,
+  buildRibbonGeometry,
+  createWaterSurface,
+} from "@metaloot/sdk/water";
+
+// A winding river: z = f(x) (or pass a parametric (u) => ({ x, z })).
+const river = createWaterSurface(
+  buildRibbonGeometry({
+    centerline: (x) => Math.sin(x * 0.02) * 30,
+    bounds: [-120, 120],
+    halfWidth: 12,
+  }),
+);
+river.group.position.y = WATER_LEVEL;
+scene.add(river.group);
+
+// Every lake below the waterline, sharing the river's material and clock —
+// exclude the river channel, its own ribbon covers it.
+const lakes = createWaterSurface(
+  buildPoolsGeometry({
+    heightAt: (x, z) => terrainHeight(x, z),
+    waterLevel: WATER_LEVEL,
+    bounds: { minX: -120, minZ: -120, maxX: 120, maxZ: 120 },
+    exclude: (x, z) => isRiverChannel(x, z),
+  }),
+  { material: river.material },
+);
+lakes.group.position.y = WATER_LEVEL;
+scene.add(lakes.group);
+
+// In the render loop — one clock per material:
+river.update(clock.getDelta());
+```
+
+Each surface is a `Group` of two meshes: the shader-driven top and a darker
+translucent "under-tint" clone a little below it that sells depth (also
+available standalone as `createUnderTint(geometry, { color, opacity,
+offsetY })`, or skip it with `underTint: false`). Colors and opacity are
+overridable — `createWaterSurface(geometry, { deep, shallow, foam, sky,
+alphaMin, alphaMax })` — and the returned handle exposes `material`,
+`uniforms`, `update(delta)`, and `dispose()`.
+
+Builder details worth knowing:
+
+- `buildRibbonGeometry` offsets the ribbon perpendicular to the local
+  centerline tangent and packs `aDepth` = 1 at the channel centre fading to
+  0 at the edges (`depthCurve` shapes the falloff). Front faces point +Y.
+- `buildPoolsGeometry` scans a grid over `bounds` (`resolution` cells per
+  axis) and keeps every quad with **any** submerged corner, so the surface
+  overlaps the bank by one cell and the shader's foam ring lands on the
+  shore. `aDepth` comes from real submersion depth (`depthScale` world units
+  → 1), vertices are deduplicated, and an empty geometry comes back when
+  nothing is below `waterLevel`.
+- Both geometries are flat at y = 0 — position the mesh/group at the water
+  level.
+
+For custom pipelines, `createWaterMaterial(opts)` returns the bare
+`ShaderMaterial` (drive `material.uniforms.uTime` yourself), and the GLSL
+sources are exported as `WATER_VERTEX_SHADER` / `WATER_FRAGMENT_SHADER`.
+Any geometry works with the material as long as it supplies the `aDepth`
+attribute (`WATER_DEPTH_ATTRIBUTE`).
+
 ## Auth
 
 Thin, typed browser helpers for the Metaloot auth endpoints every deployed
